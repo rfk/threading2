@@ -24,6 +24,10 @@ Planned extensions include:
     * native events, semaphores and timed waits on win32
     * native conditions and timed waits on pthreads platforms
 
+Stuff that might get included one day:
+
+    * ReadWriteLock (with SRW on Win Vista+, pthread_rwlock on posix)
+
 """
 
 from __future__ import with_statement

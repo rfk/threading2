@@ -1,0 +1,14 @@
+
+win32 threading primitives:
+
+  Event -> Event
+  RLock -> critical sections? mutex?
+  BoundedSemaphore -> CreateSemaphore
+  Condition -> condition variables (Vista+)
+
+
+pthreads primitives:
+
+  Condition -> condition
+  RLock -> mutex
+  
