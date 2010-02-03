@@ -2,7 +2,7 @@
 import threading2
 from threading import *
 from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
-                      _Timer,ThreadError,_time,_sleep,_get_ident
+                      _Timer,ThreadError,_time,_sleep,_get_ident,_allocate_lock
 
 
 __all__ = ["active_count","activeCount","Condition","current_thread",
@@ -14,12 +14,216 @@ __all__ = ["active_count","activeCount","Condition","current_thread",
 
 #  Expose the actual class objects, rather than the strange function-based
 #  wrappers that threading wants to stick you with.
-RLock = _RLock
-Event = _Event
-Condition = _Condition
-Semaphore = _Semaphore
-BoundedSemaphore = _BoundedSemaphore
 Timer = _Timer
+
+
+class _ContextManagerMixin(object):
+    """Simple mixin providing __enter__ and __exit__."""
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self,exc_type,exc_value,traceback):
+        self.release()
+
+
+class Lock(_ContextManagerMixin):
+    """Class-based Lock object.
+
+    This is a very thin wrapper around Python's native lock objects.  It's
+    here to provide easy subclassability and to add a "timeout" argument
+    to Lock.acquire().
+    """
+
+    def __init__(self):
+        self.__lock = _allocate_lock()
+        super(Lock,self).__init__()
+
+    def acquire(self,blocking=True,timeout=None):
+        if timeout is None:
+            return self.__lock.acquire(blocking)
+        else:
+            #  Simulated timeout using progressively longer sleeps.
+            #  This is the same timeout scheme used in the standard Condition
+            #  class.  If there's lots of contention on the lock then there's
+            #  a good chance you won't get it; but then again, Python doesn't
+            #  guarantee fairness anyway.  We hope that platform-specific
+            #  extensions can provide a better mechanism.
+            endtime = _time() + timeout
+            delay = 0.0005
+            while not self.__lock.acquire(False):
+                remaining = endtime - _time()
+                if remaining <= 0:
+                    return False
+                delay = min(delay*2,remaining,0.05)
+                _sleep(delay)
+            return True
+             
+    def release(self):
+        self.__lock.release()
+
+
+
+class RLock(_ContextManagerMixin,_RLock):
+    """Re-implemented RLock object.
+
+    This is pretty much a direct clone of the RLock object from the standard
+    threading module; the only difference is that it uses a custom Lock class
+    so that acquire() has a "timeout" parameter.
+
+    It also includes a fix for a memory leak present in Python 2.6 and older.
+    """
+
+    _LockClass = Lock
+
+    def __init__(self):
+        super(RLock,self).__init__()
+        self.__block = self._LockClass()
+        self.__owner = None
+        self.__count = 0
+
+    def acquire(self,blocking=True,timeout=None):
+        me = _get_ident()
+        if self.__owner == me:
+            self.__count += 1
+            return True
+        if self.__block.acquire(blocking,timeout):
+            self.__owner = me
+            self.__count = 1
+            return True
+        return False
+
+    def release(self):
+        if self.__owner != _get_ident():
+            raise RuntimeError("cannot release un-aquired lock")
+        self.__count -= 1
+        if not self.__count:
+            self.__owner = None
+            self.__block.release()
+
+    def _is_owned(self):
+        return self.__owner == _get_ident()
+
+
+
+class Condition(_Condition):
+    """Re-implemented Condition class.
+
+    This is pretty much a direct clone of the Condition class from the standard
+    threading module; the only difference is that it uses a custom Lock class
+    so that acquire() has a "timeout" parameter.
+    """
+
+    _LockClass = RLock
+    _WaiterLockClass = Lock
+
+    def __init__(self,lock=None):
+        if lock is None:
+            lock = self._LockClass()
+        super(Condition,self).__init__(lock)
+
+    #  This is essentially the same as the base version, but it returns
+    #  True if the wait was successful and False if it timed out.
+    def wait(self,timeout=None):
+        if not self._is_owned():
+            raise RuntimeError("cannot wait on un-aquired lock")
+        waiter = self._WaiterLockClass()
+        waiter.acquire()
+        self.__waiters.append(waiter)
+        saved_state = self._release_save()
+        try:
+            if not waiter.acquire(timeout=timeout):
+                try:
+                    self.__waiters.remove(waiter)
+                except ValueError:
+                    pass
+                return False
+            else:
+                return True
+        finally:
+            self._acquire_restore(saved_state)
+
+
+class Semaphore(_ContextManagerMixin):
+    """Re-implemented Semaphore class.
+
+    This is pretty much a direct clone of the Semaphore class from the standard
+    threading module; the only difference is that it uses a custom Condition
+    class so that acquire() has a "timeout" parameter.
+    """
+
+    _ConditionClass = Condition
+
+    def __init__(self,value=1):
+        if value < 0:
+            raise ValueError("semaphore initial value must be >= 0")
+        super(Semaphore,self).__init__()
+        self.__cond = self._ConditionClass()
+        self.__value = value
+
+    def acquire(self,blocking=True,timeout=None):
+        with self.__cond:
+            while self.__value == 0:
+                if not blocking:
+                    return False
+                if not self.__cond.wait(timeout=timeout):
+                    return False
+            self.__value = self.__value - 1
+            return True
+
+    def release(self):
+        with self.__cond:
+            self.__value = self.__value + 1
+            self.__cond.notify()
+
+
+class BoundedSemaphore(Semaphore):
+    """Semaphore that checks that # releases is <= # acquires"""
+
+    def __init__(self,value=1):
+        super(BoundedSemaphore,self).__init__(value)
+        self._initial_value = value
+
+    def release(self):
+        if self._Semaphore__value >= self._initial_value:
+            raise ValueError("Semaphore released too many times")
+        return super(BoundedSemaphore,self).release()
+
+
+class Event(object):
+    """Re-implemented Event class.
+
+    This is pretty much a direct clone of the Event class from the standard
+    threading module; the only difference is that it uses a custom Condition
+    class for easy extensibility.
+    """
+
+    _ConditionClass = Condition
+
+    def __init__(self):
+        super(Event,self).__init__()
+        self.__cond = self._ConditionClass()
+        self.__flag = False
+
+    def is_set(self):
+        return self.__flag
+    isSet = is_set
+
+    def set(self):
+        with self.__cond:
+            self.__flag = True
+            self.__cond.notify_all()
+
+    def clear(self):
+        with self.__cond:
+            self.__flag = False
+
+    def wait(self,timeout=None):
+        with self.__cond:
+            if self.__flag:
+                return True
+            return self.__cond.wait(timeout)
 
 
 class Thread(Thread):
@@ -72,7 +276,7 @@ class Thread(Thread):
         methods of the threading2 module.
         """
         new_classes = []
-        for new_cls in self.__mro__:
+        for new_cls in cls.__mro__:
             if new_cls not in thread.__class__.__mro__:
                 new_classes.append(new_cls)
         if isinstance(thread,cls):
@@ -85,7 +289,7 @@ class Thread(Thread):
             thread.__class__ = UpgradedThread
         for new_cls in new_classes:
             if hasattr(new_cls,"_upgrade_thread"):
-                new_cls._update_thread(thread)
+                new_cls._upgrade_thread(thread)
         return thread
 
     def _upgrade_thread(self):

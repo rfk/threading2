@@ -22,6 +22,6 @@ setup(name=NAME,
       long_description=LONG_DESC,
       license=LICENSE,
       keywords=KEYWORDS,
-      packages=["threading2","threading2.tests"],
+      packages=["threading2","threading2.tests","threading2.tests.stdregr"],
      )
 

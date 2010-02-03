@@ -1,35 +1,56 @@
 """
 
-  threading2:  like the threading module, but awesomer.
+  threading2:  like the standard threading module, but awesomer.
 
 This module is designed as a drop-in replacement and extension for the default
 "threading" module.  It has two main objectives:
 
-    * implement primitives using native threading functions where possible
+    * implement primitives using native platform functionality where possible
     * expose more sophisticated functionality where if can be done uniformly
 
-Some highlights (will eventually) include:
+The following extensions are currently implemented:
 
-    * ability to set (advisory) thread priorities and affinities
-    * all blocking calls take "timeout" keyword parameter
-    * native events and semaphores on win32 and pthreads platforms
-    * all exposed objects are actual classes and can be safely subclassed
+    * ability to set (advisory) thread priority
     * thread groups for simultaneous management of multiple threads
+
+The following API niceties are also included:
+
+    * all blocking methods take a "timeout" argument and return a success code
+    * all exposed objects are actual classes and can be safely subclassed
+
+Planned extensions include:
+
+    * ability to set (advisory) thread affinities
+    * native events, semaphores and timed waits on win32
+    * native conditions and timed waits on pthreads platforms
 
 """
 
-import sys
+from __future__ import with_statement
 
+
+__ver_major__ = 0
+__ver_minor__ = 1
+__ver_patch__ = 0
+__ver_sub__ = ""
+__version__ = "%d.%d.%d%s" % (__ver_major__,__ver_minor__,
+                              __ver_patch__,__ver_sub__)
+
+
+
+#  Expose some internal state of the threading module, for use by regr tests
+from threading import _active,_DummyThread
+
+#  Grab the best implementation we can use on this platform
+import sys
 try:
     if sys.platform == "win32":
-        from saltshaker.util.threading2.t2_win32 import *
+        from threading2.t2_win32 import *
     else:
-        from saltshaker.util.threading2.t2_posix import *
+        from threading2.t2_posix import *
 except ImportError:
-    from saltshaker.util.threading2.t2_base import *
+    from threading2.t2_base import *
     del sys
-
-default_group = ThreadGroup()
 
 
 __all__ = ["active_count","activeCount","Condition","current_thread",
@@ -145,6 +166,9 @@ class ThreadGroup(object):
         return True
 
 
+default_group = ThreadGroup()
+
+
 class group_local(object):
     """Group-local storage object.
 
@@ -191,5 +215,25 @@ class group_local(object):
                 del self.__attrs[group][name]
             except KeyError:
                 raise AttributeError(name)
+
+
+#  Patch current_thread() and enumerate() to always return instances
+#  of our extended Thread class.
+
+_current_thread = current_thread
+def current_thread():
+    thread = _current_thread()
+    if not isinstance(thread,Thread):
+        thread = Thread.from_thread(thread)
+    return thread
+currentThread = current_thread
+
+_enumerate = enumerate
+def enumerate():
+    threads = _enumerate()
+    for i in xrange(len(threads)):
+        if not isinstance(threads[i],Thread):
+            threads[i] = Thread.from_thread(threads[i])
+    return threads
 
 
