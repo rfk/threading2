@@ -6,7 +6,7 @@ This module is designed as a drop-in replacement and extension for the default
 "threading" module.  It has two main objectives:
 
     * implement primitives using native platform functionality where possible
-    * expose more sophisticated functionality where if can be done uniformly
+    * expose more sophisticated functionality where it can be done uniformly
 
 The following extensions are currently implemented:
 

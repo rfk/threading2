@@ -1,18 +1,26 @@
 
 
-  threading2:  like the threading module, but awesomer.
+  threading2:  like the standard threading module, but awesomer.
 
 This module is designed as a drop-in replacement and extension for the default
 "threading" module.  It has two main objectives:
 
-    * implement primitives using native threading functions where possible
+    * implement primitives using native platform functionality where possible
     * expose more sophisticated functionality where if can be done uniformly
 
-Some highlights (will eventually) include:
+The following extensions are currently implemented:
 
-    * ability to set (advisory) thread priorities and affinities
-    * all blocking calls take "timeout" keyword parameter
-    * native events and semaphores on win32 and pthreads platforms
-    * all exposed objects are actual classes and can be safely subclassed
+    * ability to set (advisory) thread priority
     * thread groups for simultaneous management of multiple threads
+
+The following API niceties are also included:
+
+    * all blocking methods take a "timeout" argument and return a success code
+    * all exposed objects are actual classes and can be safely subclassed
+
+Planned extensions include:
+
+    * ability to set (advisory) thread affinities
+    * native events, semaphores and timed waits on win32
+    * native conditions and timed waits on pthreads platforms
 
