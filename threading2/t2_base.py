@@ -247,9 +247,13 @@ class Thread(Thread):
 
     """
 
+    _ConditionClass = None
+
     def __init__(self,group=None,target=None,name=None,args=(),kwargs={},
                  daemon=None,priority=None,affinity=None):
         super(Thread,self).__init__(None,target,name,args,kwargs)
+        if self._ConditionClass is not None:
+            self.__block = self._ConditionClass()
         self.__ident = None
         if daemon is not None:
             self.daemon = daemon
