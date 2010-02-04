@@ -70,7 +70,7 @@ if hasattr(kernel32,"GetProcessAffinityMask"):
         if affinity is not None:
             mask = CPUSet(affinity).to_bitmask()
             p = kernel32.GetCurrentProcess()
-            if not kernel32.SetProcessorAffinityMask(p,mask):
+            if not kernel32.SetProcessAffinityMask(p,mask):
                 raise WinError()
         return CPUSet(_GetProcessAffinityMask()[0])
 
