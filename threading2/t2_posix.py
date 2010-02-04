@@ -42,31 +42,27 @@ def _priority_range(policy=None):
 
 class Thread(Thread):
 
-    @property
-    def priority(self):
-        return self.__priority
-
-    @priority.setter
-    def priority(self,priority):
-        assert 0 <= priority <= 1
-        self.__priority = priority
-        if self.is_alive():
+    if hasattr(pthread,"pthread_setpriority"):
+        def _set_priority(self,priority):
+            priority = super(Thread,self)._set_priority(priority)
+            me = self.ident
             (max,min) = _priority_range()
             range = max - min
             if range <= 0:
-                #  We're in a priority-less scheduler, try to change.
-                (max,min) = _priority_range(SCHED_RR)
-                value = int((max - min) * priority + min)
-                value = byref(_sched_param(value))
-                res = pthread.pthread_setschedparam(self.ident,SCHED_RR,value)
-                if res == errno.EPERM:
-                    res = 0
-                elif res:
-                    raise OSError(res,"pthread_setschedparam")
+                if hasattr(pthread,"pthread_setschedparam"):
+                    #  We're in a priority-less scheduler, try to change.
+                    (max,min) = _priority_range(SCHED_RR)
+                    value = int((max - min) * priority + min)
+                    value = byref(_sched_param(value))
+                    res = pthread.pthread_setschedparam(me,SCHED_RR,value)
+                    if res == errno.EPERM:
+                        res = 0
+                    elif res:
+                        raise OSError(res,"pthread_setschedparam")
             else:
                 value = int(range * priority + min)
-                res = pthread.pthread_setpriority(self.ident,value)
-                if res:
+                if pthread.pthread_setpriority(me,value):
                     raise OSError(res,"pthread_setpriority")
+            return priority
 
 

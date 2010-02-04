@@ -262,11 +262,11 @@ class Thread(Thread):
         else:
             self.group = group
         if priority is not None:
-            self._set_priority(priority)
+            self.priority = priority
         else:
             self.__priority = None
         if affinity is not None:
-            self._set_affinity(affinity)
+            self.affinity = affinity
         else:
             self.__affinity = None
        
@@ -353,7 +353,12 @@ class Thread(Thread):
         if not 0 <= priority <= 1:
             raise ValueError("priority must be between 0 and 1")
         self.__priority = priority
+        if self.is_alive():
+            self.priority = priority
+        return priority
     priority = property(_get_priority,_set_priority)
+    def _set_priority(self,priority):
+        return priority
 
     def _get_affinity(self):
         return self.__affinity
@@ -361,9 +366,12 @@ class Thread(Thread):
         if not isinstance(affinity,CPUAffinity):
             affinity = CPUAffinity(affinity)
         self.__affinity = affinity
+        if self.is_alive():
+            self.affinity = affinity
         return affinity
     affinity = property(_get_affinity,_set_affinity)
-
+    def _set_affinity(self,affinity):
+        return affinity
 
 
 #  Utility object for handling CPU affinity
@@ -376,9 +384,9 @@ class CPUAffinity(set):
     boolean values indicating whether each CPU is included in the set.
     """
 
+    _system_affinity = (0,)
+
     def __init__(self,set_or_mask):
-        if not hasattr(self,"num_cpus"):
-            self.num_cpus = 0
         super(CPUAffinity,self).__init__()
         if isinstance(set_or_mask,basestring):
             for i in xrange(len(set_or_mask)):
@@ -392,15 +400,21 @@ class CPUAffinity(set):
                 if cpu_mask == cur_mask & cpu_mask:
                     self.add(cpu)
                 cur_mask ^= cpu_mask
+                cpu += 1
         else:
             for i in set_or_mask:
                 self.add(i)
 
     def add(self,cpu):
         cpu = int(cpu)
-        if cpi > self.num_cpus:
-            raise ValueError("there are only %d cpus on this machine" % (cpu,))
+        if cpu not in self._system_affinity:
+            raise ValueError("no such CPU: %s" % (cpu,))
         return super(CPUAffinity,self).add(cpu)
+
+    @classmethod
+    def get_system_affinity(cls):
+        """Get the CPU affinity mask for the current process."""
+        return CPUAffinity(cls._system_affinity)
 
     @classmethod
     def get_process_affinity(cls):
@@ -408,7 +422,7 @@ class CPUAffinity(set):
         return cls([])
 
     @classmethod
-    def set_process_affinity(cls):
+    def set_process_affinity(cls,affinity):
         """Set the CPU affinity mask for the current process."""
         raise NotImplementedError
 
