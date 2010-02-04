@@ -52,38 +52,25 @@ class Thread(Thread):
             return affinity
 
 
-def _GetProcessAffinityMask():
-    pmask = c_int()
-    smask = c_int()
-    p = kernel32.GetCurrentProcess()
-    if not kernel32.GetProcessAffinityMask(p,byref(pmask),byref(smask)):
-        raise WinError()
-    return (pmask.value,smask.value)
 
+if hasattr(kernel32,"GetProcessAffinityMask"):
 
-class CPUAffinity(CPUAffinity):
+    def _GetProcessAffinityMask():
+        pmask = c_int()
+        smask = c_int()
+        p = kernel32.GetCurrentProcess()
+        if not kernel32.GetProcessAffinityMask(p,byref(pmask),byref(smask)):
+            raise WinError()
+        return (pmask.value,smask.value)
 
-    if hasattr(kernel32,"GetProcessAffinityMask"):
+    def system_affinity():
+       return CPUSet(_GetProcessAffinityMask()[1])
 
-        _system_affinity = CPUAffinity(_GetProcessAffinityMask()[1])
-
-        @classmethod
-        def get_system_affinity(cls):
-            """Get the CPU affinity mask for the current process."""
-            return cls._system_affinity
-
-        @classmethod
-        def get_process_affinity(cls):
-            """Get the CPU affinity mask for the current process."""
-            return CPUAffinity(_GetProcessAffinityMask()[0])
-
-        @classmethod
-        def set_process_affinity(cls,affinity):
-            """Get the CPU affinity mask for the current process."""
-            affinity = cls(affinity)
-            mask = affinity.to_bitmask()
+    def process_affinity(affinity=None):
+        if affinity is not None:
+            mask = CPUSet(affinity).to_bitmask()
             p = kernel32.GetCurrentProcess()
             if not kernel32.SetProcessorAffinityMask(p,mask):
                 raise WinError()
-
+        return CPUSet(_GetProcessAffinityMask()[0])
 

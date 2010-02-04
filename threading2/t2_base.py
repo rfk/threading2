@@ -8,7 +8,8 @@ from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
            "Semaphore","BoundedSemaphore","Thread","Timer","setprofile",
-           "settrace","stack_size","CPUAffinity"]
+           "settrace","stack_size","CPUSet","system_affinity",
+           "process_affinity"]
            
 
 
@@ -363,8 +364,8 @@ class Thread(Thread):
     def _get_affinity(self):
         return self.__affinity
     def _set_affinity(self,affinity):
-        if not isinstance(affinity,CPUAffinity):
-            affinity = CPUAffinity(affinity)
+        if not isinstance(affinity,CPUSet):
+            affinity = CPUSet(affinity)
         self.__affinity = affinity
         if self.is_alive():
             self.affinity = affinity
@@ -374,62 +375,58 @@ class Thread(Thread):
         return affinity
 
 
-#  Utility object for handling CPU affinity
+#  Utilities for handling CPU affinity
 
-class CPUAffinity(set):
+class CPUSet(set):
     """Object representing a set of CPUs on which a thread is to run.
 
     This is a python-level representation of the concept of a "CPU mask" as
-    used in various thread-affinity libraries.  Think of it as a list of
-    boolean values indicating whether each CPU is included in the set.
+    used in various thread-affinity libraries.  Each CPU in the system is
+    represented by an integer, with the first being CPU zero.
     """
 
-    _system_affinity = (0,)
-
-    def __init__(self,set_or_mask):
-        super(CPUAffinity,self).__init__()
-        if isinstance(set_or_mask,basestring):
-            for i in xrange(len(set_or_mask)):
-               if set_or_mask[i] != "0":
-                   self.add(i)
-        elif isinstance(set_or_mask,int):
-            cpu = 0
-            cur_mask = set_or_mask
-            while cur_mask:
-                cpu_mask = 2**cpu
-                if cpu_mask == cur_mask & cpu_mask:
-                    self.add(cpu)
-                cur_mask ^= cpu_mask
-                cpu += 1
-        else:
-            for i in set_or_mask:
-                self.add(i)
+    def __init__(self,set_or_mask=None):
+        super(CPUSet,self).__init__()
+        if set_or_mask is not None:
+            if isinstance(set_or_mask,basestring):
+               for i in xrange(len(set_or_mask)):
+                   if set_or_mask[i] != "0":
+                       self.add(i)
+            elif isinstance(set_or_mask,int):
+                # TODO: do this calculation using shifts
+                cpu = 0
+                cur_mask = set_or_mask
+                while cur_mask:
+                    cpu_mask = 2**cpu
+                    if cpu_mask == cur_mask & cpu_mask:
+                         self.add(cpu)
+                    cur_mask ^= cpu_mask
+                    cpu += 1
+            else:
+                for i in set_or_mask:
+                    self.add(i)
 
     def add(self,cpu):
-        cpu = int(cpu)
-        if cpu not in self._system_affinity:
-            raise ValueError("no such CPU: %s" % (cpu,))
-        return super(CPUAffinity,self).add(cpu)
-
-    @classmethod
-    def get_system_affinity(cls):
-        """Get the CPU affinity mask for the current process."""
-        return CPUAffinity(cls._system_affinity)
-
-    @classmethod
-    def get_process_affinity(cls):
-        """Get the CPU affinity mask for the current process."""
-        return cls([])
-
-    @classmethod
-    def set_process_affinity(cls,affinity):
-        """Set the CPU affinity mask for the current process."""
-        raise NotImplementedError
+        return super(CPUSet,self).add(int(cpu))
 
     def to_bitmask(self):
+        # TODO: do this calculation using shifts
         bitmask = 0
         for cpu in self:
             bitmask |= 2**cpu
-        return cpu
+        return bitmask
+
+
+def system_affinity():
+    """Get the set of CPUs available on this system."""
+    return CPUMask((0,))
+
+def process_affinity(affinity=None):
+    """Get or set the CPU affinity mask for the current process."""
+    if affinity is not None:
+        affinity = CPUSet(affinity)
+        if affinity != system_affinity():
+            raise ValueError("unknown cpus: %s" % affinity)
+    return system_affinity()
 
 
