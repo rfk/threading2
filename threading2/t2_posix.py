@@ -1,10 +1,11 @@
 
-from t2_base import *
-from t2_base import __all__
-
+import os
 import errno
 from ctypes import *
 from ctypes.util import find_library
+
+from t2_base import *
+from t2_base import __all__
 
 libc = find_library("pthread")
 if libc is None:
@@ -40,6 +41,39 @@ def _priority_range(policy=None):
     return (min,max)
     
 
+# TODO: there's no guarantee that the cpu_set_t structure is a long bitmask
+if hasattr(libc,"sched_setaffinity"):
+    def _do_set_affinity(tid,affinity):
+        affinity = CPUSet(affinity)
+        mask = c_long()
+        mask.value = affinity.to_bitmask()
+        if libc.sched_setaffinity(tid,sizeof(mask),byref(mask)) < 0:
+            raise OSError(libc.errno,"sched_setaffinity")
+    def _do_get_affinity(tid):
+        mask = c_long()
+        if libc.sched_getaffinity(tid,sizeof(mask),byref(mask)) < 0:
+            raise OSError(libc.errno,"sched_getaffinity")
+        return CPUSet(mask.value)
+elif hasattr(pthread,"pthread_setaffinity_np"):
+    def _do_set_affinity(tid,affinity):
+        affinity = CPUSet(affinity)
+        mask = c_long()
+        mask.value = affinity.to_bitmask()
+        res = pthread.pthread_setaffinity_np(tid,sizeof(mask),byref(mask))
+        if res:
+            raise OSError(res,"pthread_setaffinity_np")
+    def _do_get_affinity(tid):
+        mask = c_long()
+        res = pthread.pthread_getaffinity_np(tid,sizeof(mask),byref(mask))
+        if res:
+            raise OSError(res,"pthread_getaffinity_np")
+        return CPUSet(mask.value)
+else:
+    _do_set_affinity = None
+    _do_get_affinity = None
+
+
+
 class Thread(Thread):
 
     if hasattr(pthread,"pthread_setpriority"):
@@ -64,5 +98,37 @@ class Thread(Thread):
                 if pthread.pthread_setpriority(me,value):
                     raise OSError(res,"pthread_setpriority")
             return priority
+
+    if _do_set_affinity is not None:
+        def _set_affinity(self,affinity):
+            affinity = super(Thread,self)._set_affinity(affinity)
+            me = self.ident
+            _do_set_affinity(me,affinity)
+            return affinity
+
+
+def system_affinity():
+    #  Try to read cpu info from /proc
+    try:
+        with open("/proc/cpuinfo","r") as cpuinfo:
+            affinity = CPUSet()
+            for ln in cpuinfo:
+                info = ln.split()
+                if len(info) == 3:
+                    if info[0] == "processor" and info[1] == ":":
+                         affinity.add(info[2])
+            return affinity
+    except EnvironmentError:
+        pass
+    #  Fall back to the process affinity
+    return process_affinity()
+
+
+if _do_set_affinity is not None:
+    def process_affinity(affinity=None):
+        pid = os.getpid()
+        if affinity is not None:
+            _do_set_affinity(pid,affinity)
+        return _do_get_affinity(pid)
 
 
