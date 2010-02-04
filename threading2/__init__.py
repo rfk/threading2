@@ -60,7 +60,7 @@ except ImportError:
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
            "Semaphore","BoundedSemaphore","Thread","ThreadGroup","Timer",
-           "setprofile","settrace","stack_size","group_local"]
+           "setprofile","settrace","stack_size","group_local","CPUAffinity"]
 
 
 class ThreadGroup(object):

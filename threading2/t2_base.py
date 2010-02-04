@@ -8,7 +8,7 @@ from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
            "Semaphore","BoundedSemaphore","Thread","Timer","setprofile",
-           "settrace","stack_size"]
+           "settrace","stack_size","CPUAffinity"]
            
 
 
@@ -358,7 +358,64 @@ class Thread(Thread):
     def _get_affinity(self):
         return self.__affinity
     def _set_affinity(self,affinity):
+        if not isinstance(affinity,CPUAffinity):
+            affinity = CPUAffinity(affinity)
         self.__affinity = affinity
+        return affinity
     affinity = property(_get_affinity,_set_affinity)
+
+
+
+#  Utility object for handling CPU affinity
+
+class CPUAffinity(set):
+    """Object representing a set of CPUs on which a thread is to run.
+
+    This is a python-level representation of the concept of a "CPU mask" as
+    used in various thread-affinity libraries.  Think of it as a list of
+    boolean values indicating whether each CPU is included in the set.
+    """
+
+    def __init__(self,set_or_mask):
+        if not hasattr(self,"num_cpus"):
+            self.num_cpus = 0
+        super(CPUAffinity,self).__init__()
+        if isinstance(set_or_mask,basestring):
+            for i in xrange(len(set_or_mask)):
+               if set_or_mask[i] != "0":
+                   self.add(i)
+        elif isinstance(set_or_mask,int):
+            cpu = 0
+            cur_mask = set_or_mask
+            while cur_mask:
+                cpu_mask = 2**cpu
+                if cpu_mask == cur_mask & cpu_mask:
+                    self.add(cpu)
+                cur_mask ^= cpu_mask
+        else:
+            for i in set_or_mask:
+                self.add(i)
+
+    def add(self,cpu):
+        cpu = int(cpu)
+        if cpi > self.num_cpus:
+            raise ValueError("there are only %d cpus on this machine" % (cpu,))
+        return super(CPUAffinity,self).add(cpu)
+
+    @classmethod
+    def get_process_affinity(cls):
+        """Get the CPU affinity mask for the current process."""
+        return cls([])
+
+    @classmethod
+    def set_process_affinity(cls):
+        """Set the CPU affinity mask for the current process."""
+        raise NotImplementedError
+
+    def to_bitmask(self):
+        bitmask = 0
+        for cpu in self:
+            bitmask |= 2**cpu
+        return cpu
 
 
