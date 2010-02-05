@@ -22,6 +22,43 @@ class TestStandard(unittest.TestCase):
         exec std_threading_test.func_code in globals()
 
 
+class TestCPUSet(unittest.TestCase):
+    """Unittests for CPUSet class."""
+
+    def test_initialisation(self):
+        def assertSetEquals(set1,set2):
+            self.assertEquals(sorted(list(set1)),sorted(list(set2)))
+        # Initialisation from iterables
+        assertSetEquals(CPUSet(),[])
+        assertSetEquals(CPUSet([0,3,2]),[0,2,3])
+        assertSetEquals(CPUSet(""),[])
+        assertSetEquals(CPUSet("3158"),[1,3,5,8])
+        assertSetEquals(CPUSet("3158"),[1,3,5,8])
+        # Initialisation from bitmasks
+        assertSetEquals(CPUSet(0),[])
+        assertSetEquals(CPUSet(1),[0])
+        assertSetEquals(CPUSet(2),[1])
+        assertSetEquals(CPUSet(3),[0,1])
+        assertSetEquals(CPUSet(4),[2])
+        assertSetEquals(CPUSet(5),[0,2])
+        assertSetEquals(CPUSet(6),[1,2])
+        assertSetEquals(CPUSet(7),[0,1,2])
+        assertSetEquals(CPUSet(1 << 7),[7])
+        assertSetEquals(CPUSet(1 << 127),[127])
+        assertSetEquals(CPUSet(1 << 128),[128])
+
+    def test_to_bitmask(self):
+        self.assertEquals(CPUSet().to_bitmask(),0)
+        self.assertEquals(CPUSet("0").to_bitmask(),1)
+        self.assertEquals(CPUSet("1").to_bitmask(),2)
+        self.assertEquals(CPUSet("01").to_bitmask(),3)
+        self.assertEquals(CPUSet("2").to_bitmask(),4)
+        self.assertEquals(CPUSet("02").to_bitmask(),5)
+        self.assertEquals(CPUSet("12").to_bitmask(),6)
+        self.assertEquals(CPUSet("012").to_bitmask(),7)
+        for i in xrange(100):
+            self.assertEquals(CPUSet(i).to_bitmask(),i)
+
 class TestMisc(unittest.TestCase):
     """Miscellaneous test procedures."""
 

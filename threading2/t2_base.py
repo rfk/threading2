@@ -403,19 +403,13 @@ class CPUSet(set):
     def __init__(self,set_or_mask=None):
         super(CPUSet,self).__init__()
         if set_or_mask is not None:
-            if isinstance(set_or_mask,basestring):
-               for i in xrange(len(set_or_mask)):
-                   if set_or_mask[i] != "0":
-                       self.add(i)
-            elif isinstance(set_or_mask,int):
-                # TODO: do this calculation using shifts
+            if isinstance(set_or_mask,(int,long)):
                 cpu = 0
                 cur_mask = set_or_mask
                 while cur_mask:
-                    cpu_mask = 2**cpu
-                    if cpu_mask == cur_mask & cpu_mask:
-                         self.add(cpu)
-                    cur_mask ^= cpu_mask
+                    if cur_mask & 1:
+                        self.add(cpu)
+                    cur_mask = cur_mask >> 1
                     cpu += 1
             else:
                 for i in set_or_mask:
@@ -425,10 +419,9 @@ class CPUSet(set):
         return super(CPUSet,self).add(int(cpu))
 
     def to_bitmask(self):
-        # TODO: do this calculation using shifts
         bitmask = 0
         for cpu in self:
-            bitmask |= 2**cpu
+            bitmask |= 1 << cpu
         return bitmask
 
 
