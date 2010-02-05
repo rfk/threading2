@@ -42,7 +42,10 @@ def _priority_range(policy=None):
     return (min,max)
     
 
-# TODO: there's no guarantee that the cpu_set_t structure is a long bitmask
+# TODO: there's no guarantee that the cpu_set_t structure is a long bitmask.
+# TODO: this will only work up to 32 cpus.  should use system_affinity() to
+#       find max cpu number, then send in an appropriately-sized array of
+#       longs rather than a single long.
 if hasattr(libc,"sched_setaffinity"):
     def _do_set_affinity(tid,affinity):
         affinity = CPUSet(affinity)
