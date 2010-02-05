@@ -1,4 +1,5 @@
 
+import t2_base
 from t2_base import *
 from t2_base import __all__
 
@@ -65,6 +66,7 @@ if hasattr(kernel32,"GetProcessAffinityMask"):
 
     def system_affinity():
        return CPUSet(_GetProcessAffinityMask()[1])
+    system_affinity.__doc__ = t2_base.system_affinity.__doc__
 
     def process_affinity(affinity=None):
         if affinity is not None:
@@ -73,4 +75,6 @@ if hasattr(kernel32,"GetProcessAffinityMask"):
             if not kernel32.SetProcessAffinityMask(p,mask):
                 raise WinError()
         return CPUSet(_GetProcessAffinityMask()[0])
+    process_affinity.__doc__ = t2_base.process_affinity.__doc__
+
 

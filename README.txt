@@ -11,6 +11,7 @@ This module is designed as a drop-in replacement and extension for the default
 The following extensions are currently implemented:
 
     * ability to set (advisory) thread priority
+    * ability to set (advisory) CPU affinity at thread and process level
     * thread groups for simultaneous management of multiple threads
 
 The following API niceties are also included:
@@ -18,13 +19,16 @@ The following API niceties are also included:
     * all blocking methods take a "timeout" argument and return a success code
     * all exposed objects are actual classes and can be safely subclassed
 
-Planned extensions include:
+This has currently only been tested on WinXP and Ubuntu Karmic; similar 
+platforms *should* work OK, and other platforms *should* fall back to using
+sensible default behaviour, but I'm not making any guarantees at this stage.
 
-    * ability to set (advisory) thread affinities
+Additional planned extensions include:
+
     * native events, semaphores and timed waits on win32
     * native conditions and timed waits on pthreads platforms
 
 Stuff that might get included one day:
 
-    * ReadWriteLock (with SRW on Win Vista+, pthread_rwlock on posix)
+    * ReadWriteLock (using SRW on Win Vista+, pthread_rwlock on posix)
 

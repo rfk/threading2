@@ -13,13 +13,8 @@ __all__ = ["active_count","activeCount","Condition","current_thread",
            
 
 
-#  Expose the actual class objects, rather than the strange function-based
-#  wrappers that threading wants to stick you with.
-Timer = _Timer
-
-
 class _ContextManagerMixin(object):
-    """Simple mixin providing __enter__ and __exit__."""
+    """Simple mixin mapping __enter__/__exit__ to acquire/release."""
 
     def __enter__(self):
         self.acquire()
@@ -42,11 +37,22 @@ class Lock(_ContextManagerMixin):
         super(Lock,self).__init__()
 
     def acquire(self,blocking=True,timeout=None):
+        """Attempt to acquire this lock.
+
+        If the optional argument "blocking" is True and "timeout" is None,
+        this methods blocks until is successfully acquires the lock.  If
+        "blocking" is False, it returns immediately if the lock could not
+        be acquired.  Otherwise, it blocks for at most "timeout" seconds
+        trying to acquire the lock.
+
+        In all cases, this methods returns True if the lock was successfully
+        acquired and False otherwise.
+        """
         if timeout is None:
             return self.__lock.acquire(blocking)
         else:
             #  Simulated timeout using progressively longer sleeps.
-            #  This is the same timeout scheme used in the standard Condition
+            #  This is the same timeout scheme used in the stdlib Condition
             #  class.  If there's lots of contention on the lock then there's
             #  a good chance you won't get it; but then again, Python doesn't
             #  guarantee fairness anyway.  We hope that platform-specific
@@ -62,8 +68,8 @@ class Lock(_ContextManagerMixin):
             return True
              
     def release(self):
+        """Release this lock."""
         self.__lock.release()
-
 
 
 class RLock(_ContextManagerMixin,_RLock):
@@ -227,10 +233,19 @@ class Event(object):
             return self.__cond.wait(timeout)
 
 
+class Timer(_Timer):
+    """Re-implemented Timer class.
+
+    Actually there's nothing new here, it just exposes the Timer class from
+    the stdlib as a normal class in case you want to extend it.
+    """
+    pass
+
+
 class Thread(Thread):
     """Extended Thread class.
 
-    This is a subclass of the standard python Thread, which adds support
+    This is a subclass of the standard python Thread class, which adds support
     for the following new features:
 
         * a "priority" attribute, through which you can set the (advisory)
@@ -421,8 +436,14 @@ def system_affinity():
     """Get the set of CPUs available on this system."""
     return CPUMask((0,))
 
+
 def process_affinity(affinity=None):
-    """Get or set the CPU affinity mask for the current process."""
+    """Get or set the CPU affinity set for the current process.
+
+    This will affect all future threads spawned by this process.  It is
+    implementation-defined whether it will also affect previously-spawned
+    threads.
+    """
     if affinity is not None:
         affinity = CPUSet(affinity)
         if affinity != system_affinity():

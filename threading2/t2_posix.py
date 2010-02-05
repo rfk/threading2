@@ -4,6 +4,7 @@ import errno
 from ctypes import *
 from ctypes.util import find_library
 
+import t2_base
 from t2_base import *
 from t2_base import __all__
 
@@ -122,6 +123,7 @@ def system_affinity():
         pass
     #  Fall back to the process affinity
     return process_affinity()
+system_affinity.__doc__ = t2_base.system_affinity.__doc__
 
 
 if _do_set_affinity is not None:
@@ -130,5 +132,6 @@ if _do_set_affinity is not None:
         if affinity is not None:
             _do_set_affinity(pid,affinity)
         return _do_get_affinity(pid)
+    process_affinity.__doc__ = t2_base.process_affinity.__doc__
 
 

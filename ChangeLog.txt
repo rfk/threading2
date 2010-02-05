@@ -1,5 +1,9 @@
 
 
+v0.1.1:
+
+    * support for setting process- and thread-level CPU affinity.
+
 v0.1.0:
 
     * initial release - you might say *everything* has changed...
