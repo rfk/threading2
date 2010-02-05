@@ -25,6 +25,7 @@ sensible default behaviour, but I'm not making any guarantees at this stage.
 
 Additional planned extensions include:
 
+    * make stack_size a kwarg when creating a thread
     * native events, semaphores and timed waits on win32
     * native conditions and timed waits on pthreads platforms
 
