@@ -427,7 +427,7 @@ class CPUSet(set):
 
 def system_affinity():
     """Get the set of CPUs available on this system."""
-    return CPUMask((0,))
+    return CPUSet((0,))
 
 
 def process_affinity(affinity=None):
