@@ -1,5 +1,5 @@
 
-v0.1.2:
+v0.1.3:
 
     * better CPUSet <-> bitmask conversion
     * posix: dynamically calculate size of _cpuset struct.
