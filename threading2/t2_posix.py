@@ -8,7 +8,7 @@ import t2_base
 from t2_base import *
 from t2_base import __all__
 
-libc = find_library("pthread")
+libc = find_library("c")
 if libc is None:
     raise ImportError("libc not found")
 libc = CDLL(libc,use_errno=True)
@@ -49,6 +49,10 @@ def _incr_cpuset_size():
 
 
 def _priority_range(policy=None):
+    """Determine the priority range (min,max) for the given scheduler policy.
+
+    If no policy is specified, the current default policy is used.
+    """
     if policy is None:
         policy = libc.sched_getscheduler(0)
         if policy < 0:
@@ -62,6 +66,8 @@ def _priority_range(policy=None):
     return (min,max)
     
 
+#  Try to define _do_get_affinity and _do_set_affinity based on availability
+#  of the necessary functions in either libc or posix.
 if hasattr(libc,"sched_setaffinity"):
     def _do_set_affinity(tid,affinity):
         if not _HAVE_ADJUSTED_CPUSET_SIZE:

@@ -1,4 +1,9 @@
 
+v0.1.4:
+
+    * fix silly typo when loading libc (it's a miracle previous versions
+      worked at all!)
+
 v0.1.3:
 
     * better CPUSet <-> bitmask conversion
