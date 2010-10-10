@@ -7,8 +7,8 @@ from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
 
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
-           "Semaphore","BoundedSemaphore","Thread","Timer","setprofile",
-           "settrace","stack_size","CPUSet","system_affinity",
+           "Semaphore","BoundedSemaphore","Thread","Timer","SHLock",
+           "setprofile","settrace","stack_size","CPUSet","system_affinity",
            "process_affinity"]
            
 
@@ -388,6 +388,91 @@ class Thread(Thread):
     affinity = property(_get_affinity,_set_affinity)
     def _set_affinity(self,affinity):
         return affinity
+
+
+class SHLock(object):
+    """Shareable lock class.
+
+    This functions just like an RLock except that you can also request a
+    "shared" lock mode.  Shared locks can co-exist with other shared locks
+    but block exclusive locks.  You might also know this as a read/write lock.
+
+    Currently attempting to upgrade or downgrade between shared and exclusive
+    locks will cause a deadlock.  This restriction may go away in future.
+    """
+
+    _LockClass = Lock
+    _ConditionClass = Condition
+
+    def __init__(self):
+        self._lock = self._LockClass()
+        self._shared_cond = self._ConditionClass(self._lock)
+        self._exclusive_cond = self._ConditionClass(self._lock)
+        self._next_exclusive = None
+        self.is_shared = 0
+        self.is_exclusive = 0
+
+    def acquire(self,blocking=True,timeout=None,shared=False):
+        """Acquire the lock in shared or exclusive mode."""
+        with self._lock:
+            if shared:
+                self._acquire_shared(blocking,timeout)
+            else:
+                self._acquire_exclusive(blocking,timeout)
+
+    def release(self):
+        with self._lock:
+            if self.is_exclusive:
+                self.is_exclusive -= 1
+                if not self.is_exclusive:
+                    self._shared_cond.notifyAll()
+                    self._next_exclusive = None
+                    self._exclusive_cond.notify()
+            elif self.is_shared:
+                self.is_shared -= 1
+                if not self.is_shared:
+                    self._exclusive_cond.notify()
+            else:
+                raise RuntimeError("release() called on unheld lock")
+
+    def _acquire_shared(self,blocking=True,timeout=None):
+        while self.is_exclusive or self._next_exclusive is not None:
+            if not blocking:
+                return False
+            if timeout is not None:
+                starttime = _time()
+                if not self._shared_cond.wait(timeout=timeout):
+                    return False
+                timeout -= time() - starttime
+                if timeout < 0:
+                    return False
+        self.is_shared += 1
+
+    def _acquire_exclusive(self,blocking=True,timeout=None):
+        me = currentThread()
+        while self._next_exclusive not in (me,None):
+            if not blocking:
+                return False
+            if timeout is not None:
+                starttime = _time()
+                if not self._exclusive_cond.wait(timeout=timeout):
+                    return False
+                timeout -= time() - starttime
+                if timeout < 0:
+                    return False
+        self._next_exclusive = me
+        while self.is_shared:
+            if not blocking:
+                return False
+            if timeout is not None:
+                starttime = _time()
+                if not self._exclusive_cond.wait(timeout=timeout):
+                    return False
+                timeout -= time() - starttime
+                if timeout < 0:
+                    return False
+        self.is_exclusive += 1
+
 
 
 #  Utilities for handling CPU affinity

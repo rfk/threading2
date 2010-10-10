@@ -13,6 +13,7 @@ The following extensions are currently implemented:
     * ability to set (advisory) thread priority
     * ability to set (advisory) CPU affinity at thread and process level
     * thread groups for simultaneous management of multiple threads
+    * SHLock class for shared/exclusive (also known as read/write) locks
 
 The following API niceties are also included:
 
@@ -65,7 +66,7 @@ except ImportError:
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
            "Semaphore","BoundedSemaphore","Thread","ThreadGroup","Timer",
-           "setprofile","settrace","stack_size","group_local",
+           "SHLock","setprofile","settrace","stack_size","group_local",
            "CPUSet","system_affinity","process_affinity"]
 
 

@@ -1,4 +1,8 @@
 
+v0.2.0:
+
+    * add SHLock class for shared/exclusive (also known as read/write) locks.
+
 v0.1.4:
 
     * fix silly typo when loading libc (it's a miracle previous versions
