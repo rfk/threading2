@@ -29,10 +29,7 @@ Additional planned extensions include:
     * make stack_size a kwarg when creating a thread
     * native events, semaphores and timed waits on win32
     * native conditions and timed waits on pthreads platforms
-
-Stuff that might get included one day:
-
-    * ReadWriteLock (using SRW on Win Vista+, pthread_rwlock on posix)
+    * native SHLock implementations (SRW on Win Vista+, pthread_rwlock)
 
 """
 

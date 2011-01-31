@@ -5,6 +5,7 @@ from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
                       _Timer,ThreadError,_time,_sleep,_get_ident,_allocate_lock
 
 
+
 __all__ = ["active_count","activeCount","Condition","current_thread",
            "currentThread","enumerate","Event","local","Lock","RLock",
            "Semaphore","BoundedSemaphore","Thread","Timer","SHLock",
@@ -337,6 +338,8 @@ class Thread(Thread):
     def before_run(self):
         if self.__priority is not None:
             self._set_priority(self.__priority)
+        if self.__affinity is not None:
+            self._set_affinity(self.__affinity)
 
     def after_run(self):
         pass
@@ -347,6 +350,8 @@ class Thread(Thread):
             self.__ident = _get_ident()
             if self.__priority is not None:
                 self._set_priority(self.__priority)
+            if self.__affinity is not None:
+                self._set_priority(self.__affinity)
         @property
         def ident(self):
             return self.__ident

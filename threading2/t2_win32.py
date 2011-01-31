@@ -10,7 +10,7 @@ kernel32 = windll.kernel32
 
 THREAD_SET_INFORMATION = 0x20
 THREAD_PRIORITY_ABOVE_NORMAL = 1
- 
+
 
 class Thread(Thread):
 
@@ -32,6 +32,7 @@ class Thread(Thread):
                 # (THREAD_PRIORITY_LOWEST through THREAD_PRIORITY_HIGHEST)
                 value = int(round(4*priority) - 2)
             handle = kernel32.OpenThread(THREAD_SET_INFORMATION,False,self.__w32id)
+            value = c_int(value)
             try:
                 if not kernel32.SetThreadPriority(handle,value):
                     raise WinError()
