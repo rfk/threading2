@@ -1,6 +1,7 @@
 
 v0.2.1:
 
+    * fix some deadlocks in SHLock class (plus testcases)
     * ensure that the thread addinity is set properly on thread startup.
 
 v0.2.0:

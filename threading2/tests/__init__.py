@@ -5,6 +5,8 @@ import os
 import sys
 import unittest
 import doctest
+import random
+import time
 
 import threading2
 from threading2 import *
@@ -20,6 +22,28 @@ class TestStandard(unittest.TestCase):
 
     def test_standard(self):
         exec std_threading_test.func_code in globals()
+
+
+class TestSHLock(unittest.TestCase):
+    """Testcases for SHLock class."""
+
+    def test_contention(self):
+        lock = SHLock()
+        def lots_of_acquires():
+            for _ in xrange(1000):
+                shared = random.choice([True,False])
+                lock.acquire(shared=shared)
+                time.sleep(random.random() * 0.0001)
+                lock.release()
+        threads = [Thread(target=lots_of_acquires) for _ in xrange(10)]
+        for t in threads:
+            t.daemon = True
+            t.start()
+        for t in threads:
+            if not t.join(timeout=30):
+                from saltshaker.util import debug
+                debug.dump_stack_frames()
+                raise RuntimeError("SHLock deadlock")
 
 
 class TestCPUSet(unittest.TestCase):

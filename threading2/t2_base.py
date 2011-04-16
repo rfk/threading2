@@ -430,13 +430,13 @@ class SHLock(object):
             if self.is_exclusive:
                 self.is_exclusive -= 1
                 if not self.is_exclusive:
-                    self._shared_cond.notifyAll()
                     self._next_exclusive = None
-                    self._exclusive_cond.notify()
+                    self._shared_cond.notifyAll()
+                    self._exclusive_cond.notifyAll()
             elif self.is_shared:
                 self.is_shared -= 1
                 if not self.is_shared:
-                    self._exclusive_cond.notify()
+                    self._exclusive_cond.notifyAll()
             else:
                 raise RuntimeError("release() called on unheld lock")
 
@@ -444,11 +444,13 @@ class SHLock(object):
         while self.is_exclusive or self._next_exclusive is not None:
             if not blocking:
                 return False
-            if timeout is not None:
+            if timeout is None:
+                self._shared_cond.wait()
+            else:
                 starttime = _time()
                 if not self._shared_cond.wait(timeout=timeout):
                     return False
-                timeout -= time() - starttime
+                timeout -= _time() - starttime
                 if timeout < 0:
                     return False
         self.is_shared += 1
@@ -458,22 +460,26 @@ class SHLock(object):
         while self._next_exclusive not in (me,None):
             if not blocking:
                 return False
-            if timeout is not None:
+            if timeout is None:
+                self._exclusive_cond.wait()
+            else:
                 starttime = _time()
                 if not self._exclusive_cond.wait(timeout=timeout):
                     return False
-                timeout -= time() - starttime
+                timeout -= _time() - starttime
                 if timeout < 0:
                     return False
         self._next_exclusive = me
         while self.is_shared:
             if not blocking:
                 return False
-            if timeout is not None:
+            if timeout is None:
+                self._exclusive_cond.wait()
+            else:
                 starttime = _time()
                 if not self._exclusive_cond.wait(timeout=timeout):
                     return False
-                timeout -= time() - starttime
+                timeout -= _time() - starttime
                 if timeout < 0:
                     return False
         self.is_exclusive += 1
