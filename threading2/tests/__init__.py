@@ -29,21 +29,30 @@ class TestSHLock(unittest.TestCase):
 
     def test_contention(self):
         lock = SHLock()
+        done = []
         def lots_of_acquires():
             for _ in xrange(1000):
                 shared = random.choice([True,False])
                 lock.acquire(shared=shared)
+                lock.acquire(shared=shared)
                 time.sleep(random.random() * 0.0001)
                 lock.release()
-        threads = [Thread(target=lots_of_acquires) for _ in xrange(10)]
+                time.sleep(random.random() * 0.0001)
+                lock.acquire(shared=shared)
+                time.sleep(random.random() * 0.0001)
+                lock.release()
+                lock.release()
+            done.append(True)
+        threads = [Thread(target=lots_of_acquires) for _ in xrange(3)]
         for t in threads:
             t.daemon = True
             t.start()
         for t in threads:
-            if not t.join(timeout=30):
-                from saltshaker.util import debug
-                debug.dump_stack_frames()
+            if not t.join(timeout=10):
                 raise RuntimeError("SHLock deadlock")
+        if len(done) != len(threads):
+            print done, threads
+            raise RuntimeError("SHLock test error")
 
 
 class TestCPUSet(unittest.TestCase):

@@ -411,11 +411,22 @@ class SHLock(object):
 
     def __init__(self):
         self._lock = self._LockClass()
-        self._shared_cond = self._ConditionClass(self._lock)
-        self._exclusive_cond = self._ConditionClass(self._lock)
-        self._next_exclusive = None
+        #  When a shared lock is held, is_shared will give the cumulative
+        #  number of locks and _shared_owners maps each owning thread to
+        #  the number of locks is holds.
         self.is_shared = 0
+        self._shared_owners = {}
+        #  When an exclusive lock is held, is_exclusive will give the number
+        #  of locks held and _exclusive_owner will give the owning thread
         self.is_exclusive = 0
+        self._exclusive_owner = None
+        #  When someonce is forced to wait for a lock, they add themselves
+        #  to one of these queues along with a "waiter" condition that 
+        #  is used to wake them up.
+        self._shared_queue = []
+        self._exclusive_queue = []
+        #  This is for recycling waiter objects.
+        self._free_waiters = []
 
     def acquire(self,blocking=True,timeout=None,shared=False):
         """Acquire the lock in shared or exclusive mode."""
@@ -424,65 +435,116 @@ class SHLock(object):
                 self._acquire_shared(blocking,timeout)
             else:
                 self._acquire_exclusive(blocking,timeout)
+            assert not (self.is_shared and self.is_exclusive)
 
     def release(self):
+        """Release the lock."""
+        #  This decrements the appropriate lock counters, and if the lock
+        #  becomes free, it looks for a queued thread to hand it off to.
+        #  By doing the handoff here we ensure fairness.
+        me = currentThread()
         with self._lock:
             if self.is_exclusive:
+                if self._exclusive_owner is not me:
+                    raise RuntimeError("release() called on unheld lock")
                 self.is_exclusive -= 1
                 if not self.is_exclusive:
-                    self._next_exclusive = None
-                    self._shared_cond.notifyAll()
-                    self._exclusive_cond.notifyAll()
+                    self._exclusive_owner = None
+                    #  If there are waiting shared locks, issue them
+                    #  all and them wake everyone up.
+                    if self._shared_queue:
+                        for (thread,waiter) in self._shared_queue:
+                            self.is_shared += 1
+                            self._shared_owners[thread] = 1
+                            waiter.notify()
+                        del self._shared_queue[:]
+                    #  Otherwise, if there are waiting exclusive locks,
+                    #  they get first dibbs on the lock.
+                    elif self._exclusive_queue:
+                        (thread,waiter) = self._exclusive_queue.pop(0)
+                        self._exclusive_owner = thread
+                        self.is_exclusive += 1
+                        waiter.notify()
             elif self.is_shared:
+                try:
+                    self._shared_owners[me] -= 1
+                    if self._shared_owners[me] == 0:
+                        del self._shared_owners[me]
+                except KeyError:
+                    raise RuntimeError("release() called on unheld lock")
                 self.is_shared -= 1
                 if not self.is_shared:
-                    self._exclusive_cond.notifyAll()
+                    #  If there are waiting exclusive locks,
+                    #  they get first dibbs on the lock.
+                    if self._exclusive_queue:
+                        (thread,waiter) = self._exclusive_queue.pop(0)
+                        self._exclusive_owner = thread
+                        self.is_exclusive += 1
+                        waiter.notify()
+                    else:
+                        assert not self._shared_queue
             else:
                 raise RuntimeError("release() called on unheld lock")
 
     def _acquire_shared(self,blocking=True,timeout=None):
-        while self.is_exclusive or self._next_exclusive is not None:
+        me = currentThread()
+        #  Each case: acquiring a lock we already hold.
+        if self.is_shared and me in self._shared_owners:
+            self.is_shared += 1
+            self._shared_owners[me] += 1
+            return True
+        #  If the lock is already spoken for by an exclusive, add us
+        #  to the shared queue and it will give us the lock eventually.
+        if self.is_exclusive or self._exclusive_queue:
+            if self._exclusive_owner is me:
+                raise RuntimeError("can't downgrade SHLock object")
             if not blocking:
                 return False
-            if timeout is None:
-                self._shared_cond.wait()
-            else:
-                starttime = _time()
-                if not self._shared_cond.wait(timeout=timeout):
+            waiter = self._take_waiter()
+            try:
+                self._shared_queue.append((me,waiter))
+                if not waiter.wait(timeout=timeout):
+                    self._shared_queue.remove(waiter)
                     return False
-                timeout -= _time() - starttime
-                if timeout < 0:
-                    return False
-        self.is_shared += 1
+                assert not self.is_exclusive
+            finally:
+                self._return_waiter(waiter)
+        else:
+            self.is_shared += 1
+            self._shared_owners[me] = 1
 
     def _acquire_exclusive(self,blocking=True,timeout=None):
         me = currentThread()
-        while self._next_exclusive not in (me,None):
+        #  Each case: acquiring a lock we already hold.
+        if self._exclusive_owner is me:
+            assert self.is_exclusive
+            self.is_exclusive += 1
+            return True
+        #  If the lock is already spoken for, add us to the exclusive queue.
+        #  This will eventually give us the lock when it's our turn.
+        if self.is_shared or self.is_exclusive:
             if not blocking:
                 return False
-            if timeout is None:
-                self._exclusive_cond.wait()
-            else:
-                starttime = _time()
-                if not self._exclusive_cond.wait(timeout=timeout):
+            waiter = self._take_waiter()
+            try:
+                self._exclusive_queue.append((me,waiter))
+                if not waiter.wait(timeout=timeout):
+                    self._exclusive_queue.remove(waiter)
                     return False
-                timeout -= _time() - starttime
-                if timeout < 0:
-                    return False
-        self._next_exclusive = me
-        while self.is_shared:
-            if not blocking:
-                return False
-            if timeout is None:
-                self._exclusive_cond.wait()
-            else:
-                starttime = _time()
-                if not self._exclusive_cond.wait(timeout=timeout):
-                    return False
-                timeout -= _time() - starttime
-                if timeout < 0:
-                    return False
-        self.is_exclusive += 1
+            finally:
+                self._return_waiter(waiter)
+        else:
+            self._exclusive_owner = me
+            self.is_exclusive += 1
+
+    def _take_waiter(self):
+        try:
+            return self._free_waiters.pop()
+        except IndexError:
+            return self._ConditionClass(self._lock)
+
+    def _return_waiter(self,waiter):
+        self._free_waiters.append(waiter)
 
 
 
