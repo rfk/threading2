@@ -450,8 +450,8 @@ class SHLock(object):
                 self.is_exclusive -= 1
                 if not self.is_exclusive:
                     self._exclusive_owner = None
-                    #  If there are waiting shared locks, issue them
-                    #  all and them wake everyone up.
+                    #  If there are waiting shared locks, issue it to them
+                    #  all and then wake everyone up.
                     if self._shared_queue:
                         for (thread,waiter) in self._shared_queue:
                             self.is_shared += 1
@@ -504,7 +504,7 @@ class SHLock(object):
             try:
                 self._shared_queue.append((me,waiter))
                 if not waiter.wait(timeout=timeout):
-                    self._shared_queue.remove(waiter)
+                    self._shared_queue.remove((me,waiter))
                     return False
                 assert not self.is_exclusive
             finally:
@@ -529,7 +529,7 @@ class SHLock(object):
             try:
                 self._exclusive_queue.append((me,waiter))
                 if not waiter.wait(timeout=timeout):
-                    self._exclusive_queue.remove(waiter)
+                    self._exclusive_queue.remove((me,waiter))
                     return False
             finally:
                 self._return_waiter(waiter)
@@ -600,5 +600,4 @@ def process_affinity(affinity=None):
         if affinity != system_affinity():
             raise ValueError("unknown cpus: %s" % affinity)
     return system_affinity()
-
 
