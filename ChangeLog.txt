@@ -1,4 +1,9 @@
 
+v0.3.0:
+
+    * ThreadGroup: use weakrefs internally to avoid creating memory leaks.
+    * SHLock: fix cleanup logic when acquire() times out
+
 v0.2.1:
 
     * rework SHLock class to avoid deadlocks, be fair and re-entrant.
