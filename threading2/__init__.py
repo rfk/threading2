@@ -43,13 +43,13 @@ __ver_sub__ = ""
 __version__ = "%d.%d.%d%s" % (__ver_major__,__ver_minor__,
                               __ver_patch__,__ver_sub__)
 
-
+import sys
+import weakref
 
 #  Expose some internal state of the threading module, for use by regr tests
 from threading import _active,_DummyThread
 
 #  Grab the best implementation we can use on this platform
-import sys
 try:
     if sys.platform == "win32":
         from threading2.t2_win32 import *
@@ -82,9 +82,11 @@ class ThreadGroup(object):
     def __init__(self,name=None):
         self.name = name
         self.__lock = Lock()
-        self.__threads = set()
         self.__priority = None
         self.__affinity = None
+        # Ideally we'd use a WeakSet here, but it's not available
+        # in older versions of python.
+        self.__threads = weakref.WeakKeyDictionary()
 
     def __str__(self):
         if not self.name:
@@ -92,7 +94,7 @@ class ThreadGroup(object):
         return "<ThreadGroup '%s' at %s>" % (self.name,id(self),)
 
     def _add_thread(self,thread):
-        self.__threads.add(thread)
+        self.__threads[thread] = True
 
     @property
     def priority(self):
