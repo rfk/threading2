@@ -67,36 +67,8 @@ def _priority_range(policy=None):
     
 
 #  Try to define _do_get_affinity and _do_set_affinity based on availability
-#  of the necessary functions in either libc or posix.
-if hasattr(libc,"sched_setaffinity"):
-    def _do_set_affinity(tid,affinity):
-        if not _HAVE_ADJUSTED_CPUSET_SIZE:
-            _do_get_affinity(tid)
-        affinity = CPUSet(affinity)
-        mask = _cpuset()
-        bitmask = affinity.to_bitmask()
-        chunkmask = 2**(8*sizeof(_cpuset_bits_t))-1
-        for i in xrange(_CPUSET_SIZE):
-            mask.bits[i] = bitmask & chunkmask
-            bitmask = bitmask >> (8*sizeof(_cpuset_bits_t))
-        if libc.sched_setaffinity(tid,sizeof(mask),byref(mask)) < 0:
-            raise OSError(get_errno(),"sched_setaffinity")
-    def _do_get_affinity(tid):
-        global _HAVE_ADJUSTED_CPUSET_SIZE
-        _HAVE_ADJUSTED_CPUSET_SIZE = True
-        mask = _cpuset()
-        if libc.sched_getaffinity(tid,sizeof(mask),byref(mask)) < 0:
-            eno = get_errno()
-            if eno == errno.EINVAL and _CPUSET_SIZE < _MAX_CPUSET_SIZE:
-                _incr_cpuset_size()
-                return _do_get_affinity(tid)
-            raise OSError(eno,"sched_getaffinity")
-        intmask = 0
-        shift = 8*sizeof(_cpuset_bits_t)
-        for i in xrange(len(mask.bits)):
-            intmask |= mask.bits[i] << (i*shift)
-        return CPUSet(intmask)
-elif hasattr(pthread,"pthread_setaffinity_np"):
+#  of the necessary functions in libpthread.
+if hasattr(pthread,"pthread_setaffinity_np"):
     def _do_set_affinity(tid,affinity):
         if not _HAVE_ADJUSTED_CPUSET_SIZE:
             _do_get_affinity(tid)
@@ -115,7 +87,7 @@ elif hasattr(pthread,"pthread_setaffinity_np"):
             if res == errno.EINVAL and _CPUSET_SIZE < _MAX_CPUSET_SIZE:
                 _incr_cpuset_size()
                 return _do_get_affinity(tid)
-            raise OSError(res,"pthread_get_affinity_no")
+            raise OSError(res,"pthread_get_affinity_np")
         intmask = 0
         shift = 8*sizeof(_cpuset_bits_t)
         for i in xrange(len(mask.bits)):
@@ -124,7 +96,6 @@ elif hasattr(pthread,"pthread_setaffinity_np"):
 else:
     _do_set_affinity = None
     _do_get_affinity = None
-
 
 
 class Thread(Thread):
@@ -178,12 +149,43 @@ def system_affinity():
 system_affinity.__doc__ = t2_base.system_affinity.__doc__
 
 
-if _do_set_affinity is not None:
+if hasattr(libc,"sched_setaffinity"):
+
+    def _do_set_proc_affinity(pid,affinity):
+        if not _HAVE_ADJUSTED_CPUSET_SIZE:
+            _do_get_affinity(pid)
+        affinity = CPUSet(affinity)
+        print "AFFINITY", affinity
+        mask = _cpuset()
+        bitmask = affinity.to_bitmask()
+        chunkmask = 2**(8*sizeof(_cpuset_bits_t))-1
+        for i in xrange(_CPUSET_SIZE):
+            mask.bits[i] = bitmask & chunkmask
+            bitmask = bitmask >> (8*sizeof(_cpuset_bits_t))
+        if libc.sched_setaffinity(pid,sizeof(mask),byref(mask)) < 0:
+            raise OSError(get_errno(),"sched_setaffinity")
+
+    def _do_get_proc_affinity(pid):
+        global _HAVE_ADJUSTED_CPUSET_SIZE
+        _HAVE_ADJUSTED_CPUSET_SIZE = True
+        mask = _cpuset()
+        if libc.sched_getaffinity(pid,sizeof(mask),byref(mask)) < 0:
+            eno = get_errno()
+            if eno == errno.EINVAL and _CPUSET_SIZE < _MAX_CPUSET_SIZE:
+                _incr_cpuset_size()
+                return _do_get_affinity(pid)
+            raise OSError(eno,"sched_getaffinity")
+        intmask = 0
+        shift = 8*sizeof(_cpuset_bits_t)
+        for i in xrange(len(mask.bits)):
+            intmask |= mask.bits[i] << (i*shift)
+        return CPUSet(intmask)
+
     def process_affinity(affinity=None):
         pid = os.getpid()
         if affinity is not None:
-            _do_set_affinity(pid,affinity)
-        return _do_get_affinity(pid)
+            _do_set_proc_affinity(pid,affinity)
+        return _do_get_proc_affinity(pid)
     process_affinity.__doc__ = t2_base.process_affinity.__doc__
 
 

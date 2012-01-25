@@ -597,7 +597,7 @@ def process_affinity(affinity=None):
     """
     if affinity is not None:
         affinity = CPUSet(affinity)
-        if affinity != system_affinity():
+        if not affinity.issubset(system_affinity()):
             raise ValueError("unknown cpus: %s" % affinity)
     return system_affinity()
 

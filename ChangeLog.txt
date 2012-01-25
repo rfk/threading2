@@ -1,4 +1,9 @@
 
+v0.3.1:
+
+    * posix: don't try to use sched_setaffinity for setting thread affinity.
+      It requires the os-level thread id which we do not know without hackery.
+
 v0.3.0:
 
     * ThreadGroup: use weakrefs internally to avoid creating memory leaks.
