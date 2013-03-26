@@ -1,4 +1,3 @@
-
 import threading2
 from threading import *
 from threading import _RLock,_Event,_Condition,_Semaphore,_BoundedSemaphore, \
@@ -351,7 +350,7 @@ class Thread(Thread):
             if self.__priority is not None:
                 self._set_priority(self.__priority)
             if self.__affinity is not None:
-                self._set_priority(self.__affinity)
+                self._set_affinity(self.__affinity)
         @property
         def ident(self):
             return self.__ident
