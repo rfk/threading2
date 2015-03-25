@@ -394,7 +394,7 @@ class Thread(Thread):
         return affinity
 
 
-class SHLock(object):
+class SHLock(_ContextManagerMixin):
     """Shareable lock class.
 
     This functions just like an RLock except that you can also request a
@@ -404,6 +404,22 @@ class SHLock(object):
     Currently attempting to upgrade or downgrade between shared and exclusive
     locks will cause a deadlock.  This restriction may go away in future.
     """
+
+    class Context(_ContextManagerMixin):
+        def __init__(self, parent,
+                     blocking=True, timeout=None, shared=False):
+            self.parent = parent
+            self.blocking = blocking
+            self.timeout = timeout
+            self.shared = shared
+
+        def acquire(self):
+            self.parent.acquire(blocking=self.blocking,
+                                timeout=self.timeout,
+                                shared=self.shared)
+
+        def release(self):
+            self.parent.release()
 
     _LockClass = Lock
     _ConditionClass = Condition
@@ -426,6 +442,10 @@ class SHLock(object):
         self._exclusive_queue = []
         #  This is for recycling waiter objects.
         self._free_waiters = []
+
+    def __call__(self,blocking=True,timeout=None,shared=False):
+        return SHLock.Context(self, blocking=blocking,
+                              timeout=timeout, shared=shared)
 
     def acquire(self,blocking=True,timeout=None,shared=False):
         """Acquire the lock in shared or exclusive mode."""
