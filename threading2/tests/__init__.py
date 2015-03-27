@@ -54,6 +54,55 @@ class TestSHLock(unittest.TestCase):
             print done, threads
             raise RuntimeError("SHLock test error")
 
+class TestSHLockContext(unittest.TestCase):
+    class TestPassed(Exception): pass
+
+    @staticmethod
+    def raise_test_passed(): raise TestSHLockContext.TestPassed
+
+    @staticmethod
+    def noop(*args, **kwargs): pass
+
+    def check_args(self, *args, **kwargs):
+        def f(*f_args, **f_kwargs):
+            self.assertItemsEqual(args, f_args)
+            self.assertItemsEqual(kwargs, f_kwargs)
+            raise TestSHLockContext.TestPassed
+        return f
+
+    def test_context_without_args(self):
+
+        lock_acquire = SHLock()
+        lock_acquire.acquire = TestSHLockContext.raise_test_passed
+        with self.assertRaises(TestSHLockContext.TestPassed):
+            with lock_acquire:
+                pass
+
+        lock_release = SHLock()
+        lock_release.release = TestSHLockContext.raise_test_passed
+        with self.assertRaises(TestSHLockContext.TestPassed):
+            with lock_release:
+                pass
+
+    def test_context_with_args(self):
+        for passed,expected in (
+                ({}, {'shared':False, 'blocking':False, 'timeout':None}),
+                ({'shared':True}, {'shared':True, 'blocking':False, 'timeout':None}),
+                ({'blocking':True}, {'shared':False, 'blocking':True, 'timeout':None}),
+                ({'timeout':1}, {'shared':False, 'blocking':True, 'timeout':1}),
+                ):
+            lock_acquire_arg = SHLock()
+            lock_acquire_arg.acquire = self.check_args(**expected)
+            with self.assertRaises(TestSHLockContext.TestPassed):
+                with lock_acquire_arg(**passed):
+                    pass
+
+            lock_release_arg = SHLock()
+            lock_acquire_arg.acquire = TestSHLockContext.noop
+            lock_release_arg.release = TestSHLockContext.raise_test_passed
+            with self.assertRaises(TestSHLockContext.TestPassed):
+                with lock_release_arg(**passed):
+                    pass
 
 class TestCPUSet(unittest.TestCase):
     """Unittests for CPUSet class."""
