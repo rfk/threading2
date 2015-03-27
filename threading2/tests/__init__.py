@@ -63,10 +63,9 @@ class TestSHLockContext(unittest.TestCase):
     @staticmethod
     def noop(*args, **kwargs): pass
 
-    def check_args(self, *args, **kwargs):
-        def f(*f_args, **f_kwargs):
-            self.assertItemsEqual(args, f_args)
-            self.assertItemsEqual(kwargs, f_kwargs)
+    def check_args(self, passed, expected):
+        def f(**f_kwargs):
+            self.assertItemsEqual(expected.items(), f_kwargs.items(), 'Passed {} Got {} Expected {}'.format(passed, f_kwargs, expected))
             raise TestSHLockContext.TestPassed
         return f
 
@@ -86,13 +85,13 @@ class TestSHLockContext(unittest.TestCase):
 
     def test_context_with_args(self):
         for passed,expected in (
-                ({}, {'shared':False, 'blocking':False, 'timeout':None}),
-                ({'shared':True}, {'shared':True, 'blocking':False, 'timeout':None}),
-                ({'blocking':True}, {'shared':False, 'blocking':True, 'timeout':None}),
+                ({}, {'shared':False, 'blocking':True, 'timeout':None}),
+                ({'shared':True}, {'shared':True, 'blocking':True, 'timeout':None}),
+                ({'blocking':False}, {'shared':False, 'blocking':False, 'timeout':None}),
                 ({'timeout':1}, {'shared':False, 'blocking':True, 'timeout':1}),
                 ):
             lock_acquire_arg = SHLock()
-            lock_acquire_arg.acquire = self.check_args(**expected)
+            lock_acquire_arg.acquire = self.check_args(passed, expected)
             with self.assertRaises(TestSHLockContext.TestPassed):
                 with lock_acquire_arg(**passed):
                     pass
