@@ -1,6 +1,16 @@
 
+Status: Unmaintained
+====================
 
-  threading2:  like the standard threading module, but awesomer.
+.. image:: http://unmaintained.tech/badge.svg
+     :target: http://unmaintained.tech/
+     :alt: No Maintenance Intended
+
+I am `no longer actively maintaining this project <https://rfk.id.au/blog/entry/archiving-open-source-projects/>`_.
+
+
+threading2:  like the standard threading module, but awesomer.
+==============================================================
 
 This module is designed as a drop-in replacement and extension for the default
 "threading" module.  It has two main objectives:
